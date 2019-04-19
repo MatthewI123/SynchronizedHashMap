@@ -1,7 +1,6 @@
 #include <iostream>
 #include <cerrno>
 #include <thread>
-#include "Constants.hpp"
 #include "Operation.hpp"
 #include "Server.hpp"
 #include "TCPInputOutput.hpp"

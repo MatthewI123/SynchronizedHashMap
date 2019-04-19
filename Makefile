@@ -8,7 +8,7 @@ clean:
 	rm -f Server.out Client.out
 
 server:
-	$(CXX) Server/*.cpp -o Server.out
+	$(CXX) -DHASHTABLE_SERVER Server/*.cpp -o Server.out
 
 client:
-	$(CXX) Client/*.cpp -o Client.out
+	$(CXX) -DHASHTABLE_CLIENT Client/*.cpp -o Client.out

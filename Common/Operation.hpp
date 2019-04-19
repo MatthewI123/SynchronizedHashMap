@@ -2,19 +2,23 @@
 
 namespace Network
 {
+	/** Operations the server accepts.
+	 */
 	enum class Operation : unsigned int
 	{
-		GET = 0,
-		POST = 1,
-		ERASE = 2
+		GET   = 0, // get value
+		POST  = 1, // set value
+		ERASE = 2, // erase value
 	};
 
+	/** Server response codes.
+	 */
 	enum class Result : unsigned int
 	{
-		SUCCESS = 0,
-		REFUSED = 1, // for too many connections
+		SUCCESS       = 0, // okay [string]
+		REFUSED       = 1, // too many connections
 		BAD_OPERATION = 2, // invalid operation
-		BAD_KEY = 3, // invalid key for GET/DELETE
-		BAD_PACKET = 4 // malformed paket
+		BAD_KEY       = 3, // invalid key for GET/DELETE
+		BAD_PACKET    = 4, // malformed paket
 	};
 }

@@ -1,15 +1,14 @@
 #pragma once
 
-#include "Constants.hpp"
 #include "TCPSocket.hpp"
 
 namespace Network::Server
 {
 	/** Start listening for connections.
 	 */
-	inline void Listen(TCPSocket& server, const char* hostname = TCPSocket::ANY_IP, unsigned short port = Constants::PORT, int backlog = 3)
+	inline void Listen(TCPSocket& server, const char* address, unsigned short port, int backlog)
 	{
-		server.SetAddress(hostname, port);
+		server.SetAddress(address, port);
 
 		if (bind(server.m_socketDescriptor, reinterpret_cast<sockaddr*>(&server.m_address), sizeof(sockaddr_in)) != 0)
 			throw std::runtime_error("bind error");

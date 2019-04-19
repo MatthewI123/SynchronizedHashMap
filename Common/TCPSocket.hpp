@@ -12,6 +12,12 @@ extern "C"
 #include <unistd.h>
 }
 
+#ifdef HASHTABLE_SERVER
+namespace Network::Server { }
+#else
+namespace Network::Client { }
+#endif
+
 namespace Network
 {
 	/** The TCPSocket class encapsulates the socket object and provides an interface around it.
@@ -21,12 +27,6 @@ namespace Network
 	{
 	public:
 		static constexpr const char* ANY_IP = INADDR_ANY;
-
-		int m_socketDescriptor;
-		sockaddr_in m_address;
-		std::string m_read_stream;
-		std::string m_write_stream;
-		std::size_t m_read_pos = 0;
 
 		/** Constructs a TCPSocket with a new socket.
 		 */
@@ -47,23 +47,45 @@ namespace Network
 		 */
 		~TCPSocket()
 		{
-			shutdown(m_socketDescriptor, SHUT_RDWR);
-			close(m_socketDescriptor);
+			if (m_socketDescriptor != -1) {
+				shutdown(m_socketDescriptor, SHUT_RDWR);
+				close(m_socketDescriptor);
+				m_socketDescriptor = -1;
+			}
 		}
 
-		/** Assigns an address to the socket.
+		/** Disable copying TCPSockets.
 		 */
-		void SetAddress(const char* hostname, unsigned short port)
-		{
-			if (hostname == ANY_IP) {
-				m_address.sin_addr.s_addr = INADDR_ANY;
-			} else {
-				if (inet_pton(AF_INET, hostname, &m_address.sin_addr) != 1)
-					throw std::runtime_error("could not resolve IP from given hostname");
-			}
+		TCPSocket(const TCPSocket& socket) = delete;
+		TCPSocket& operator=(const TCPSocket& socket) = delete;
 
-			m_address.sin_family = AF_INET;
-			m_address.sin_port = htobe16(port);
+		/** Move constructor.
+		 */
+		TCPSocket(TCPSocket&& socket) noexcept
+		: m_socketDescriptor(socket.m_socketDescriptor)
+		, m_address(std::move(socket.m_address))
+		, m_read_stream(std::move(socket.m_read_stream))
+		, m_write_stream(std::move(socket.m_write_stream))
+		, m_read_pos(socket.m_read_pos)
+		{
+			socket.m_socketDescriptor = -1;
+			socket.m_read_pos = 0;
+		}
+
+		/** Move assignment.
+		 */
+		TCPSocket& operator=(TCPSocket&& socket) noexcept
+		{
+			m_socketDescriptor = socket.m_socketDescriptor;
+			m_address = std::move(socket.m_address);
+			m_read_stream = std::move(socket.m_read_stream);
+			m_write_stream = std::move(socket.m_write_stream);
+			m_read_pos = socket.m_read_pos;
+
+			socket.m_socketDescriptor = -1;
+			socket.m_read_pos = 0;
+
+			return *this;
 		}
 
 		/** Gets a readable address.
@@ -78,29 +100,12 @@ namespace Network
 			return std::string(address);
 		}
 
+		/** Gets the port.
+		 */
 		unsigned short GetPort() const noexcept
 		{
 			return be16toh(m_address.sin_port);
 		}
-
-		void Write(std::string& stream, const void* value, std::size_t size)
-		{
-			m_write_stream.resize(m_write_stream.size() + size);
-			std::copy(reinterpret_cast<const char*>(value), reinterpret_cast<const char*>(value) + size, m_write_stream.begin() + m_write_stream.size() - size);
-		}
-
-		void Read(void* buffer, std::size_t size)
-		{
-			const char* begin = m_read_stream.data() + m_read_pos;
-
-			if (begin + size <= m_read_stream.data() + m_read_stream.size()) {
-				std::copy(begin, begin + size, reinterpret_cast<char*>(buffer));
-				m_read_pos += size;
-			} else {
-				throw std::runtime_error("unexpected end of stream");
-			}
-		}
-
 
 		/** Writes an arithmetic or buffer-like type to the output stream.
 		 */
@@ -148,6 +153,56 @@ namespace Network
 			}
 
 			return *this;
+		}
+
+	private:
+#ifdef HASHTABLE_SERVER
+		friend void Server::Listen(TCPSocket& server, const char* address, unsigned short port, int backlog);
+		friend TCPSocket Server::Accept(TCPSocket& server);
+#else
+		friend void Client::Connect(TCPSocket& client, const char* address, unsigned short port);
+#endif
+		int m_socketDescriptor;
+		sockaddr_in m_address;
+		std::string m_read_stream;
+		std::string m_write_stream;
+		std::size_t m_read_pos = 0;
+
+		/** Assigns an address to the socket.
+		 */
+		void SetAddress(const char* address, unsigned short port)
+		{
+			if (address == ANY_IP) {
+				m_address.sin_addr.s_addr = INADDR_ANY;
+			} else {
+				if (inet_pton(AF_INET, address, &m_address.sin_addr) != 1)
+					throw std::runtime_error("could not resolve IP from given address");
+			}
+
+			m_address.sin_family = AF_INET;
+			m_address.sin_port = htobe16(port);
+		}
+
+		/** Writes a buffer to the write stream.
+		 */
+		void Write(std::string& stream, const void* value, std::size_t size)
+		{
+			m_write_stream.resize(m_write_stream.size() + size);
+			std::copy(reinterpret_cast<const char*>(value), reinterpret_cast<const char*>(value) + size, m_write_stream.begin() + m_write_stream.size() - size);
+		}
+
+		/** Reads a buffer from the read stream.
+		 */
+		void Read(void* buffer, std::size_t size)
+		{
+			const char* begin = m_read_stream.data() + m_read_pos;
+
+			if (begin + size <= m_read_stream.data() + m_read_stream.size()) {
+				std::copy(begin, begin + size, reinterpret_cast<char*>(buffer));
+				m_read_pos += size;
+			} else {
+				throw std::runtime_error("unexpected end of stream");
+			}
 		}
 	};
 }

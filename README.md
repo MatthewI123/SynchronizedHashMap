@@ -1,6 +1,5 @@
 # Client/Server Hashtable Project
-## CSC 456
-## Matthew
+## CSC 415 - Matthew
 
 
 # Running
