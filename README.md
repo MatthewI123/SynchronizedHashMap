@@ -1,23 +1,27 @@
 # Client/Server Hashtable Project
+
 ## CSC 415 - Matthew
 
 
 # Running
+
 1. Build the project by invoking `make`.
-2. Start a server by invoking `./Server.out`
-3. Start a client by invoking `./Client.out -m post -k MyKey -v MyValue`
+2. Start a server by invoking `./Server`
+3. Start a client by invoking `./Client post MyKey MyValue`
 
 
 # Server
 
 ```
 Usage:
-	Server.out [option]...
+	Server [option]... [address] [port]
+
+	If address is unspecified, it defaults to 0.0.0.0 (0.0.0.0 for any interface).
+	If port is unspecified, it defaults to 1000 (0 for any port).
 
 Option:
-	t	target host (default: 127.0.0.1)
-	p	port (default: 1000)
-	n	number of threads (default: 4) TODO
+	t	number of threads (default: 4)
+	h	shows usage
 ```
 
 
@@ -25,12 +29,11 @@ Option:
 
 ```
 Usage:
-	Client.out [option]...
+	Client [option]... <get | erase> <key>
+	Client [option]... post <key> <value>
 
 Option:
-	t	server host (default: 127.0.0.1)
+	a	server address (default: 127.0.0.1)
 	p	server port (default: 1000)
-	m	method (required, either `get`, `post`, `erase`)
-	k	key (required)
-	v	value (required if method is `post`)
+	h	shows usage
 ```

@@ -12,11 +12,23 @@ extern "C"
 #include <unistd.h>
 }
 
+namespace Network
+{
+	class TCPSocket;
+
 #ifdef HASHTABLE_SERVER
-namespace Network::Server { }
+	namespace Server
+	{
+		inline void Listen(TCPSocket& server, const char* address, unsigned short port, int backlog);
+		inline TCPSocket Accept(TCPSocket& server);
+	}
 #else
-namespace Network::Client { }
+	namespace Client
+	{
+		inline void Connect(TCPSocket& client, const char* address, unsigned short port);
+	}
 #endif
+}
 
 namespace Network
 {
@@ -26,7 +38,7 @@ namespace Network
 	class TCPSocket
 	{
 	public:
-		static constexpr const char* ANY_IP = INADDR_ANY;
+		static constexpr std::nullptr_t ANY_IP = nullptr;
 
 		/** Constructs a TCPSocket with a new socket.
 		 */
@@ -156,6 +168,8 @@ namespace Network
 		}
 
 	private:
+		friend void Send(TCPSocket& socket);
+		friend void Receive(TCPSocket& socket);
 #ifdef HASHTABLE_SERVER
 		friend void Server::Listen(TCPSocket& server, const char* address, unsigned short port, int backlog);
 		friend TCPSocket Server::Accept(TCPSocket& server);
