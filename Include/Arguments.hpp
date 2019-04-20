@@ -43,7 +43,7 @@ namespace Implementation::Arguments
 	{
 		static constexpr auto func = [](const char* str)
 		{
-			constexpr auto checkLimit = [](auto value) -> T
+			constexpr auto checkLimit = [](auto value)
 			{
 				using limit = std::numeric_limits<T>;
 
@@ -168,8 +168,6 @@ namespace Implementation::Arguments
 					throw std::runtime_error(std::string("option '") + static_cast<char>(optopt) + "' missing");
 				else if (opt != '?')
 					HandleOption<OptionDescriptor>(static_cast<char>(opt), options, optionValues, std::make_index_sequence<OptionDescriptor::Size>());
-				else
-					; // unknown option
 			}
 
 			// handle arguments
