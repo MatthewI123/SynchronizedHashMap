@@ -2,6 +2,7 @@
 
 #include <array>
 #include <limits>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <tuple>
@@ -80,6 +81,15 @@ namespace Implementation::Arguments
 		static constexpr auto func = [](const char* str)
 		{
 			return std::string(str);
+		};
+	};
+
+	template<typename T>
+	struct AcceptableType<std::optional<T>, std::enable_if_t<AcceptableType<T>::value>> : std::true_type
+	{
+		static constexpr auto func = [](const char* str)
+		{
+			return AcceptableType<T>::func(str);
 		};
 	};
 }
@@ -210,6 +220,9 @@ namespace Implementation::Arguments
 	}
 }
 
+/** Parses command-line arguments.
+ * Returns the option values and argument values separately.
+ */
 template<std::size_t OptionCount, typename... Type>
 constexpr auto ParseArguments(std::array<char, OptionCount> options, std::tuple<Type...> defaults, int argc, char* argv[])
 {

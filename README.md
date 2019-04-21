@@ -29,11 +29,26 @@ Option:
 
 ```
 Usage:
-	Client [option]... <get | erase> <key>
+	Client [option]... <get | delete> <key>
 	Client [option]... post <key> <value>
 
 Option:
 	a	server address (default: 127.0.0.1)
 	p	server port (default: 1000)
+	h	shows usage
+```
+
+
+# Test
+
+```
+Usage:
+	Test [option]... [address] [port]
+
+	If address is unspecified, it defaults to 127.0.0.1.
+	If port is unspecified, it defaults to 1000.
+
+Option:
+	n	number of clients (default: 10)
 	h	shows usage
 ```

@@ -8,7 +8,7 @@ namespace Network
 	 */
 	inline void Send(TCPSocket& socket)
 	{
-		const std::string& content = socket.m_write_stream;
+		const std::string& content = socket.m_writeStream;
 		std::size_t headerSize = sizeof(std::size_t);
 		std::size_t contentLength = Traits::template hton<std::size_t>::func(content.size());
 		std::size_t written = 0;
@@ -33,16 +33,16 @@ namespace Network
 				throw std::runtime_error("error writing");
 		}
 
-		socket.m_write_stream.clear();
+		socket.m_writeStream.clear();
 	}
 
 	/** Reads from the socket into the read stream.
 	 */
 	void Receive(TCPSocket& socket)
 	{
-		std::string& content = socket.m_read_stream;
+		std::string& content = socket.m_readStream;
 		content.clear();
-		socket.m_read_pos = 0;
+		socket.m_readPos = 0;
 
 		std::size_t headerSize = sizeof(std::size_t);
 		std::size_t contentLength = 0;
@@ -67,8 +67,10 @@ namespace Network
 
 			if (count < 0)
 				throw std::runtime_error("error reading");
+			else if (count == 0 && seen != contentLength)
+				throw std::runtime_error("malformed packet");
 
-			if (seen == headerSize && count != 0) {
+			if (seen == headerSize) {
 				contentLength = Traits::template ntoh<std::size_t>::func(contentLengthRead);
 				content.resize(contentLength);
 			}

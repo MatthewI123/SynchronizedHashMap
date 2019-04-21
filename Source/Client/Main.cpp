@@ -10,92 +10,80 @@ constexpr const char* USAGE = R"!!(Usage:
 
 Option:
 	a	server address (default: 127.0.0.1)
-	p	server port (default: 1000))!!";
-
-auto HandleCLAs(int argc, char* argv[])
-{
-	std::tuple<std::string, unsigned short, Network::Operation, std::string, std::string> values;
-	int opt, n;
-
-	std::get<0>(values) = "127.0.0.1";
-	std::get<1>(values) = 1000;
-
-	while ((opt = getopt(argc, argv, ":a:p:")) != -1) {
-		if (opt == 'a') {
-			std::get<0>(values) = optarg;
-		} else if (opt == 'p') {
-			using range = std::numeric_limits<unsigned short>;
-			int port = std::stoi(optarg);
-
-			if (port < range::min() || port > range::max())
-				throw std::runtime_error("port out of range");
-			std::get<1>(values) = static_cast<unsigned short>(port);
-		} else if (opt == ':') {
-			throw std::runtime_error(std::string("option '") + static_cast<char>(optopt) + "' missing");
-		} else if (opt == '?') {
-			std::cerr << "ignoring option '" << static_cast<char>(optopt) << "'\n";
-		}
-	}
-
-	n = argc - optind;
-
-	if (n >= 2) {
-		std::string_view operation = argv[optind];
-
-		if (operation == "get")
-			std::get<2>(values) = Network::Operation::GET;
-		else if (operation == "post")
-			std::get<2>(values) = Network::Operation::POST;
-		else if (operation == "erase")
-			std::get<2>(values) = Network::Operation::ERASE;
-		else
-			throw std::runtime_error(std::string("unknown operation '") + operation.data() + '\'');
-
-		std::get<3>(values) = argv[optind + 1];
-
-		if (std::get<2>(values) == Network::Operation::POST) {
-			if (n < 3)
-				throw std::runtime_error("expected value field for the post operation");
-			else
-				std::get<4>(values) = argv[optind + 2];
-		}
-	} else {
-		throw std::runtime_error("expected operation and key fields");
-	}
-
-	return values;
-}
+	p	server port (default: 1000)
+	h	shows usage)!!";
 
 int main(int argc, char* argv[])
 {
-	if (argc == 1) { // print usage
-		std::cout << USAGE << '\n';
-		return 0;
-	}
-
 	try {
-		auto arguments = HandleCLAs(argc, argv);
+		auto parsed = ParseArguments<
+			3, // option count
+			std::string, unsigned short, bool, // option types
+			std::optional<std::string>, std::optional<std::string>, std::optional<std::string> // argument types
+		>(
+			{ 'a', 'p', 'h' }, // option names
+			{
+				"127.0.0.1", 1000, false, // default option values
+				{ }, { }, { } // default argument values
+			},
+			argc, argv);
+
+		const auto& options = std::get<0>(parsed);
+		const auto& arguments = std::get<1>(parsed);
+
+		const auto& address = std::get<0>(options);
+		auto port = std::get<1>(options);
+		const auto& operation = std::get<0>(arguments);
+		const auto& key = std::get<1>(arguments);
+		const auto& value = std::get<2>(arguments);
+		Network::Operation op;
+
+		if (std::get<2>(options)) {
+			std::cout << USAGE << "\n";
+			return 0;
+		}
+
+		if (!operation.has_value())
+			throw std::runtime_error("expected operation argument");
+		if (!key.has_value())
+			throw std::runtime_error("expected key argument");
+
+		if (operation == "get")
+			op = Network::Operation::GET;
+		else if (operation == "post")
+			op = Network::Operation::POST;
+		else if (operation == "delete")
+			op = Network::Operation::DELETE;
+		else
+			throw std::runtime_error("bad operation");
+
+		if (op == Network::Operation::POST && !value.has_value())
+			throw std::runtime_error("expected value for post");
 
 		Network::TCPSocket socket;
 		Network::Result result;
 
-		Network::Client::Connect(socket, std::get<0>(arguments).data(), std::get<1>(arguments));
 
-		socket << std::get<2>(arguments); // operation
-		socket << std::get<3>(arguments); // key
+		socket << op; // operation
+		socket << key.value();
 
-		if (std::get<2>(arguments) == Network::Operation::POST)
-			socket << std::get<4>(arguments); // value
+		if (op == Network::Operation::POST)
+			socket << value.value();
 
+		Network::Client::Connect(socket, address.data(), port);
 		Network::Send(socket);
 		Network::Receive(socket);
 
 		socket >> result;
 
 		if (result == Network::Result::SUCCESS) {
-			std::string message;
-			socket >> message;
-			std::cout << message << '\n';
+			std::cout << "Success";
+
+			if (op == Network::Operation::GET) {
+				std::string message;
+				socket >> message;
+				std::cout << ": " << message << '\n';
+			}
 		} else if (result == Network::Result::REFUSED) {
 			std::cout << "server busy\n";
 		} else if (result == Network::Result::BAD_KEY) {

@@ -1,2 +1,4 @@
-*.out
+Server
+Client
+Test
 .vscode/

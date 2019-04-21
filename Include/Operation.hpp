@@ -8,7 +8,7 @@ namespace Network
 	{
 		GET   = 0, // get value
 		POST  = 1, // set value
-		ERASE = 2, // erase value
+		DELETE = 2, // delete value
 	};
 
 	/** Server response codes.

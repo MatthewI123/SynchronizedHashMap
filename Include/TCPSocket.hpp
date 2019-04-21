@@ -76,12 +76,12 @@ namespace Network
 		TCPSocket(TCPSocket&& socket) noexcept
 		: m_socketDescriptor(socket.m_socketDescriptor)
 		, m_address(std::move(socket.m_address))
-		, m_read_stream(std::move(socket.m_read_stream))
-		, m_write_stream(std::move(socket.m_write_stream))
-		, m_read_pos(socket.m_read_pos)
+		, m_readStream(std::move(socket.m_readStream))
+		, m_writeStream(std::move(socket.m_writeStream))
+		, m_readPos(socket.m_readPos)
 		{
 			socket.m_socketDescriptor = -1;
-			socket.m_read_pos = 0;
+			socket.m_readPos = 0;
 		}
 
 		/** Move assignment.
@@ -90,13 +90,12 @@ namespace Network
 		{
 			m_socketDescriptor = socket.m_socketDescriptor;
 			m_address = std::move(socket.m_address);
-			m_read_stream = std::move(socket.m_read_stream);
-			m_write_stream = std::move(socket.m_write_stream);
-			m_read_pos = socket.m_read_pos;
+			m_readStream = std::move(socket.m_readStream);
+			m_writeStream = std::move(socket.m_writeStream);
+			m_readPos = socket.m_readPos;
 
 			socket.m_socketDescriptor = -1;
-			socket.m_read_pos = 0;
-
+			socket.m_readPos = 0;
 			return *this;
 		}
 
@@ -127,13 +126,13 @@ namespace Network
 			if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T>) {
 				T serialized = static_cast<T>(Traits::template hton<T>::func(value));
 
-				Write(m_write_stream, reinterpret_cast<const char*>(&serialized), sizeof(T));
+				Write(m_writeStream, reinterpret_cast<const char*>(&serialized), sizeof(T));
 			} else if constexpr (std::is_constructible_v<std::string_view, T>) {
 				std::string_view buff(value);
 				std::size_t size = Traits::template hton<std::size_t>::func(buff.size());
 
-				Write(m_write_stream, reinterpret_cast<const char*>(&size), sizeof(std::size_t));
-				Write(m_write_stream, buff.data(), buff.size());
+				Write(m_writeStream, reinterpret_cast<const char*>(&size), sizeof(std::size_t));
+				Write(m_writeStream, buff.data(), buff.size());
 			} else {
 				static_assert(Traits::dependent_false<T>::value, "TCPSocket::Write<T>(const T&) - unsupported type T");
 			}
@@ -178,9 +177,9 @@ namespace Network
 #endif
 		int m_socketDescriptor;
 		sockaddr_in m_address;
-		std::string m_read_stream;
-		std::string m_write_stream;
-		std::size_t m_read_pos = 0;
+		std::string m_readStream;
+		std::string m_writeStream;
+		std::size_t m_readPos = 0;
 
 		/** Assigns an address to the socket.
 		 */
@@ -201,19 +200,19 @@ namespace Network
 		 */
 		void Write(std::string& stream, const void* value, std::size_t size)
 		{
-			m_write_stream.resize(m_write_stream.size() + size);
-			std::copy(reinterpret_cast<const char*>(value), reinterpret_cast<const char*>(value) + size, m_write_stream.begin() + m_write_stream.size() - size);
+			m_writeStream.resize(m_writeStream.size() + size);
+			std::copy(reinterpret_cast<const char*>(value), reinterpret_cast<const char*>(value) + size, m_writeStream.begin() + m_writeStream.size() - size);
 		}
 
 		/** Reads a buffer from the read stream.
 		 */
 		void Read(void* buffer, std::size_t size)
 		{
-			const char* begin = m_read_stream.data() + m_read_pos;
+			const char* begin = m_readStream.data() + m_readPos;
 
-			if (begin + size <= m_read_stream.data() + m_read_stream.size()) {
+			if (begin + size <= m_readStream.data() + m_readStream.size()) {
 				std::copy(begin, begin + size, reinterpret_cast<char*>(buffer));
-				m_read_pos += size;
+				m_readPos += size;
 			} else {
 				throw std::runtime_error("unexpected end of stream");
 			}
