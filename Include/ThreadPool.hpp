@@ -49,7 +49,22 @@ public:
 
 	void JoinAll()
 	{
-		while (!m_threadPool.empty())
-			m_threadPool.front().join();
+		std::lock_guard<std::mutex> guard(m_mutex);
+
+		while (!m_threadPool.empty()) {
+			bool joined = false;
+
+			for (auto& thread : m_threadPool) {
+				if (thread.joinable()) {
+					joined = true;
+					m_mutex.unlock();
+					thread.join();
+					break;
+				}
+			}
+
+			if (joined)
+				m_mutex.lock();
+		}
 	}
 };

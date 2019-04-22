@@ -124,7 +124,7 @@ namespace Network
 		TCPSocket& operator<<(const T& value)
 		{
 			if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T>) {
-				T serialized = static_cast<T>(Traits::template hton<T>::func(value));
+				auto serialized = Traits::template hton<T>::func(value);
 
 				Write(m_writeStream, reinterpret_cast<const char*>(&serialized), sizeof(T));
 			} else if constexpr (std::is_constructible_v<std::string_view, T>) {
@@ -147,7 +147,7 @@ namespace Network
 		{
 			if constexpr (std::is_arithmetic_v<T> || std::is_enum_v<T>) {
 				Read(reinterpret_cast<char*>(&value), sizeof(T));
-				value = static_cast<T>(Traits::template ntoh<T>::func(value));
+				value = Traits::template ntoh<T>::func(value);
 			} else if constexpr (std::is_assignable_v<T, std::string>) {
 				std::string buffer;
 				std::size_t size;

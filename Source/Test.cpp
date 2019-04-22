@@ -4,7 +4,7 @@
 #include <thread>
 #include <vector>
 #include "Arguments.hpp"
-#include "Logger.hpp"
+#include "ThreadPool.hpp"
 
 constexpr const char* USAGE = R"!!(Usage:
 	Test [option]... [address] [port]
@@ -14,19 +14,20 @@ constexpr const char* USAGE = R"!!(Usage:
 
 Option:
 	n	number of clients (default: 10)
+	t       number of threads (default: 4)
 	h	shows usage)!!";
 
 int main(int argc, char* argv[])
 {
 	try {
 		auto parsed = ParseArguments<
-			2, // option count
-			unsigned char, bool, // option types
+			3, // option count
+			unsigned char, unsigned char, bool, // option types
 			std::string, unsigned short // argument types
 		>(
-			{ 'n', 'h' }, // option names
+			{ 'n', 't', 'h' }, // option names
 			{
-				4, false, // default option values
+				10, 4, false, // default option values
 				"127.0.0.1", 1000 // default argument values
 			},
 			argc, argv);
@@ -35,18 +36,21 @@ int main(int argc, char* argv[])
 		const auto& arguments = std::get<1>(parsed);
 
 		auto clients = std::get<0>(options);
+		auto threads = std::get<1>(options);
 		const auto& address = std::get<0>(arguments);
 		auto port = std::get<1>(arguments);
 
-		if (std::get<1>(options)) {
+		if (std::get<2>(options)) {
 			std::cout << USAGE << "\n";
 			return 0;
 		}
 
-		std::vector<std::thread> threadPool;
-		threadPool.reserve(clients);
+		if (threads == 0)
+			throw std::runtime_error("at least 1 thread is required");
 
-		std::mt19937 generator;
+		ThreadPool threadPool(threads);
+
+		std::mt19937 generator(std::chrono::high_resolution_clock::now().time_since_epoch().count());
 
 		for (std::size_t client = 0; client < clients; client++) {
 			int gen = std::uniform_int_distribution<int>(0, 2)(generator);
@@ -69,16 +73,16 @@ int main(int argc, char* argv[])
 
 			std::cout << "Running " << stream.str().data() << '\n';
 
-			threadPool.emplace_back([](auto stream) {
-				Logger logger(stream.str() + ": ");
-				system(stream.str().data());
-				logger << "done.\n";
-				logger.write_out();
-			}, std::move(stream));
+			if (threadPool.CanQueue()) {
+				threadPool.Queue([](auto stream) {
+					system(stream.str().data());
+				}, std::move(stream));
+			} else {
+				std::this_thread::sleep_for(std::chrono::seconds(1));
+			}
 		}
 
-		for (auto& thread : threadPool)
-			thread.join();
+		threadPool.JoinAll();
 	} catch (const std::exception& e) {
 		std::cerr << e.what() << '\n';
 		return 1;

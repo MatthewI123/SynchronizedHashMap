@@ -82,12 +82,14 @@ int main(int argc, char* argv[])
 			if (op == Network::Operation::GET) {
 				std::string message;
 				socket >> message;
-				std::cout << ": " << message << '\n';
+				std::cout << ": " << message;
 			}
+
+			std::cout << '\n';
 		} else if (result == Network::Result::REFUSED) {
 			std::cout << "server busy\n";
 		} else if (result == Network::Result::BAD_KEY) {
-			std::cout << "<unknown key>\n";
+			std::cout << "** could not get/delete key, it does not exist! **\n";
 		} else {
 			/* already checked for valid operation in HandleCLAs */
 			/* already checked for missing value in HandleCLAs */

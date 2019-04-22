@@ -10,6 +10,7 @@
 #include <unordered_map>
 #include <utility>
 #include <vector>
+#include "Traits.hpp"
 #include "TypeList.hpp"
 
 extern "C"
@@ -17,94 +18,18 @@ extern "C"
 #include <unistd.h>
 }
 
-namespace Implementation::Arguments
-{
-	template<typename T, typename = void>
-	struct AcceptableType : std::false_type { };
-
-	template<typename T>
-	struct AcceptableType<T, std::enable_if_t<std::is_same_v<T, bool>>> : std::true_type
-	{
-		static constexpr auto func = [](const char* str)
-		{
-			std::string_view view(str);
-
-			if (view == "true" || view == "1")
-				return true;
-			else if (view == "false" || view == "0")
-				return false;
-			else
-				throw std::runtime_error("bad bool value");
-		};
-	};
-
-
-	template<typename T>
-	struct AcceptableType<T, std::enable_if_t<std::is_integral_v<T>>> : std::true_type
-	{
-		static constexpr auto func = [](const char* str)
-		{
-			constexpr auto checkLimit = [](auto value)
-			{
-				using limit = std::numeric_limits<T>;
-
-				if (value >= limit::min() && value <= limit::max())
-					return static_cast<T>(value);
-				else
-					throw std::runtime_error("value too large");
-			};
-
-			if constexpr (std::is_unsigned_v<T>)
-				return checkLimit(std::stoull(str));
-			else
-				return checkLimit(std::stoll(str));
-		};
-	};
-
-	template<typename T>
-	struct AcceptableType<T, std::enable_if_t<std::is_floating_point_v<T>>> : std::true_type
-	{
-		static constexpr auto func = [](const char* str)
-		{
-			if constexpr (std::is_same_v<T, float>)
-				return std::stof(str);
-			else if constexpr(std::is_same_v<T, double>)
-				return std::stod(str);
-			else
-				return std::stold(str);
-		};
-	};
-
-	template<typename T>
-	struct AcceptableType<T, std::enable_if_t<std::is_same_v<T, std::string>>> : std::true_type
-	{
-		static constexpr auto func = [](const char* str)
-		{
-			return std::string(str);
-		};
-	};
-
-	template<typename T>
-	struct AcceptableType<std::optional<T>, std::enable_if_t<AcceptableType<T>::value>> : std::true_type
-	{
-		static constexpr auto func = [](const char* str)
-		{
-			return AcceptableType<T>::func(str);
-		};
-	};
-}
-
+using namespace Arguments::Traits;
 
 namespace Implementation::Arguments
 {
 	template<typename OptionDescriptor, std::size_t Index, typename OptionValues>
-	void HandleOption(char opt, const std::array<char, OptionDescriptor::Size>& options, OptionValues& values)
+	inline void HandleOption(char opt, const std::array<char, OptionDescriptor::Size>& options, OptionValues& values)
 	{
 		if (opt == options[Index]) {
 			using type = typename OptionDescriptor::template Type<Index>;
 
 			if constexpr (!std::is_same_v<type, bool>) {
-				using trait = AcceptableType<type>;
+				using trait = argument_type<type>;
 				static_assert(trait::value, "unaccepted argument type");
 
 				std::get<Index>(values) = trait::func(optarg);
@@ -115,14 +40,14 @@ namespace Implementation::Arguments
 	}
 
 	template<typename OptionDescriptor, typename OptionValues, std::size_t... OptionIndex>
-	void HandleOption(char opt, const std::array<char, OptionDescriptor::Size>& options, OptionValues& values, std::index_sequence<OptionIndex...>)
+	inline void HandleOption(char opt, const std::array<char, OptionDescriptor::Size>& options, OptionValues& values, std::index_sequence<OptionIndex...>)
 	{
 
 		(... , HandleOption<OptionDescriptor, OptionIndex>(opt, options, values));
 	}
 
 	template<typename OptionDescriptor, std::size_t Index>
-	void AppendOption(const std::array<char, OptionDescriptor::Size>& options, std::string& optstring)
+	inline void AppendOption(const std::array<char, OptionDescriptor::Size>& options, std::string& optstring)
 	{
 		optstring += options[Index];
 
@@ -131,7 +56,7 @@ namespace Implementation::Arguments
 	}
 
 	template<typename OptionDescriptor, std::size_t... OptionIndex>
-	void AppendOptions(const std::array<char, OptionDescriptor::Size>& options, std::string& optstring, std::index_sequence<OptionIndex...>)
+	inline void AppendOptions(const std::array<char, OptionDescriptor::Size>& options, std::string& optstring, std::index_sequence<OptionIndex...>)
 	{
 		(... , AppendOption<OptionDescriptor, OptionIndex>(options, optstring));
 	}
@@ -141,18 +66,18 @@ namespace Implementation::Arguments
 namespace Implementation::Arguments
 {
 	template<typename ArgumentDescriptor, std::size_t Index, typename ArgumentValues>
-	void HandleArgument(ArgumentValues& arguments, int count, char* argv[])
+	inline void HandleArgument(ArgumentValues& arguments, std::size_t count, char* argv[])
 	{
 		if (Index < count) {
 			using type = typename ArgumentDescriptor::template Type<Index>;
-			using trait = AcceptableType<type>;
+			using trait = argument_type<type>;
 
 			std::get<Index>(arguments) = trait::func(argv[optind + Index]);
 		}
 	}
 
 	template<typename ArgumentDescriptor, typename ArgumentValues, std::size_t... ArgumentIndex>
-	void HandleArguments(ArgumentValues& arguments, int count, char* argv[], std::index_sequence<ArgumentIndex...>)
+	inline void HandleArguments(ArgumentValues& arguments, std::size_t count, char* argv[], std::index_sequence<ArgumentIndex...>)
 	{
 		(... , HandleArgument<ArgumentDescriptor, ArgumentIndex>(arguments, count, argv));
 	}
@@ -161,7 +86,7 @@ namespace Implementation::Arguments
 namespace Implementation::Arguments
 {
 	template<typename OptionDescriptor, typename ArgumentDescriptor, typename OptionValues, typename ArgumentValues>
-	void ParseArguments(OptionValues& optionValues, ArgumentValues& argumentValues, std::array<char, OptionDescriptor::Size> options, int argc, char* argv[])
+	inline void ParseArguments(OptionValues& optionValues, ArgumentValues& argumentValues, std::array<char, OptionDescriptor::Size> options, int argc, char* argv[])
 	{
 		std::string optstring;
 		optstring.reserve(OptionDescriptor::Size*2 + 1); // worst case
@@ -181,7 +106,8 @@ namespace Implementation::Arguments
 			}
 
 			// handle arguments
-			HandleArguments<ArgumentDescriptor>(argumentValues, argc - optind, argv, std::make_index_sequence<ArgumentDescriptor::Size>());
+			if (argc - optind > 0)
+				HandleArguments<ArgumentDescriptor>(argumentValues, static_cast<std::size_t>(argc - optind), argv, std::make_index_sequence<ArgumentDescriptor::Size>());
 
 		}
 	}
@@ -190,14 +116,14 @@ namespace Implementation::Arguments
 namespace Implementation::Arguments
 {
 	template<std::size_t Index, std::size_t Count, typename Tuple>
-	constexpr auto TupleSubsequence(Tuple& tuple)
+	inline constexpr auto TupleSubsequence(Tuple& tuple)
 	{
 		if constexpr (Count > 0) {
 			return std::tuple_cat(
 				std::tuple(std::move(std::get<Index>(tuple))),
 				TupleSubsequence<Index + 1, Count - 1>(tuple));
 		} else {
-			return std::tuple();
+			return std::tuple<>();
 		}
 	}
 }
@@ -209,7 +135,7 @@ namespace Implementation::Arguments
 	 *  OptionCount will typically be small and std::array is constexpr-able.
 	 */
 	template<std::size_t OptionCount>
-	constexpr void CheckDuplicates(const std::array<char, OptionCount>& array)
+	inline constexpr void CheckDuplicates(const std::array<char, OptionCount>& array)
 	{
 		for (std::size_t i = 0; i < OptionCount; i++) {
 			for (std::size_t j = i + 1; j < OptionCount; j++) {
